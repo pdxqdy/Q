@@ -6,6 +6,10 @@
 
 #### 目标
 + https://zhuanlan.zhihu.com/p/28059817
++ 独立框架
++ 友好API
++ 支持SQL
++ 支持工具一键生成 ORM
 
 #### 版本
 + 0.1
