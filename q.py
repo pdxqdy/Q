@@ -1,4 +1,4 @@
-class Queryable(object):
+class Q(object):
 
     expression_list = []
 
@@ -32,8 +32,9 @@ class Queryable(object):
         pass
 
     @classmethod
-    def delete(cls):
-        pass
+    def delete(cls, *keys):
+        cls.expression_list.append(Node('delete', *keys))
+        return cls
 
     @classmethod
     def where(cls, *keys):
@@ -66,7 +67,6 @@ class Queryable(object):
         cls.expression_list.append(n)
         return cls
 
-
 class T(object):
     @classmethod
     def count(cls, node):
@@ -82,6 +82,16 @@ class T(object):
     def max(cls, node):
         func = 'max({})'
         return Function(node, func)
+
+    @classmethod
+    def alias(cls, node, name):
+        if isinstance(node, Function):
+            func = '{} as {}'.format(node.func, _escape(name))
+            node.func = func
+            return node
+        else:
+            func = '{} as ' + _escape(name)
+            return Function(node, func)
 
 
 class Node(object):
@@ -119,6 +129,10 @@ class SQL(object):
 
             if node.op == 'update':
                 sub_sql = self._generate_update(node.args)
+                sql.append(sub_sql)
+
+            if node.op == 'delete':
+                sub_sql = self._generate_delete(node.args)
                 sql.append(sub_sql)
 
         return _join_string(sql, ' ')
@@ -162,13 +176,16 @@ class SQL(object):
         values = _join_string(map(_escape, form.values()))
         return SQLPattern.insert.format(tablename, fileds, values)
 
-
     def _generate_update(self, node):
         form = node[0]
         tablename = self.mapper.get('tablename')
         es = [SQLPattern.set_element.format(k, _escape(v)) for k, v in form.items()]
         sub_sql = [SQLPattern.update.format(tablename), SQLPattern.set.format(_join_string(es))]
         return _join_string(sub_sql, ' ')
+
+    def _generate_delete(self, node):
+        tablename = self.mapper.get('tablename')
+        return SQLPattern.delete.format(tablename)
 
 
 class Expression(object):
@@ -241,6 +258,7 @@ def _join_string(_list, glue=', '):
     _list = map(str, _list)
     return glue.join(_list)
 
+
 def _escape(s, template="'{}'"):
     return template.format(s)
 
@@ -254,11 +272,12 @@ class SQLPattern(object):
     update = 'update {}'
     set = 'set {}'
     set_element = '{} = {}'
+    delete = 'delete from {}'
 
 
 
 if __name__ == '__main__':
-    class User(Queryable):
+    class User(Q):
         __tablename__ = 'user'
         name = CharField()
         age = IntergerField()
@@ -314,6 +333,18 @@ if __name__ == '__main__':
         {
             'comment': "User.update(form).where(User.name != '森').execute().generate()",
             'sql': User.update(form).where(User.name != '森').execute().generate(),
+        },
+        {
+            'comment': "User.delete().where(User.name != '森').execute().generate()",
+            'sql': User.delete().where(User.name != '森').execute().generate(),
+        },
+        {
+            'comment': "User.select(T.alias(T.max(User.age), 'max_age'), T.distinct(User.name)).execute().generate()",
+            'sql': User.select(T.alias(T.max(User.age), 'max_age'), T.distinct(User.name)).execute().generate(),
+        },
+        {
+            'comment': "User.select(T.alias(User.name, 'user_name')).execute().generate()",
+            'sql': User.select(T.alias(User.name, 'user_name')).execute().generate(),
         },
     ]
 
