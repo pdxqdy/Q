@@ -1,6 +1,10 @@
+from db import QSQLite
+
+
 class Q(object):
 
     expression_list = []
+    db = QSQLite('test.db')
 
     @classmethod
     def table_name(cls):
@@ -51,7 +55,15 @@ class Q(object):
 
     @classmethod
     def execute(cls):
-        sql = SQL(cls.expression_list, cls.field())
+        sql = SQL(cls.expression_list, cls.field()).generate()
+        data = cls.db._execute_sql(sql)
+        cls.expression_list = []
+        # sql.generate()
+        return data
+
+    @classmethod
+    def generate_sql(cls):
+        sql = SQL(cls.expression_list, cls.field()).generate()
         cls.expression_list = []
         return sql
 
@@ -67,6 +79,7 @@ class Q(object):
         cls.expression_list.append(n)
         return cls
 
+
 class T(object):
     @classmethod
     def count(cls, node):
@@ -75,7 +88,7 @@ class T(object):
 
     @classmethod
     def distinct(cls, node):
-        func = 'distinct({})'
+        func = 'distinct {}'
         return Function(node, func)
 
     @classmethod
@@ -277,6 +290,21 @@ class SQLPattern(object):
 
 
 if __name__ == '__main__':
+    # Q v0.2
+    sql = '''
+        CREATE TABLE user
+          (
+             id     INT PRIMARY KEY,
+             name   CHAR(50) NOT NULL,
+             age    INT NOT NULL,
+             gender INT(50),
+             phone  CHAR(50)
+          );
+    '''
+    try:
+        QSQLite('test.db')._execute_sql(sql)
+    except sqlite3.OperationalError:
+        pass
     class User(Q):
         __tablename__ = 'user'
         name = CharField()
@@ -288,87 +316,99 @@ if __name__ == '__main__':
         name='sen',
         age=18,
     )
+    for i in range(10):
+        User.new(form).execute()
+        users = User.select(User.age).where(User.name == 'sen').execute()
+        for user in users:
+            print(user)
 
-    sqls = [
-        {
-            'comment': 'User.select().execute().generate()',
-            'sql': User.select().execute().generate(),
-        },
-        {
-            'comment': 'User.select(User.name).execute().generate()',
-            'sql': User.select(User.name).execute().generate(),
-        },
-        {
-            'comment': 'User.select(User.name, User.age).execute().generate()',
-            'sql': User.select(User.name, User.age).execute().generate(),
-        },
-        {
-            'comment': "User.select(User.name, User.age).where(User.phone == '136********').execute().generate()",
-            'sql': User.select(User.name, User.age).where(User.phone == '136********').execute().generate(),
-        },
-        {
-            'comment': "User.select(User.name, User.age).where((User.gender == '男') & (User.age >= 18)).execute().generate()",
-            'sql': User.select(User.name, User.age).where((User.gender == '男') & (User.age >= 18)).execute().generate(),
-        },
-        {
-            'comment': 'User.select(T.count(User.name)).execute().generate()',
-            'sql': User.select(T.count(User.name)).execute().generate(),
-        },
-        {
-            'comment': 'User.select(T.distinct(User.name)).execute().generate()',
-            'sql': User.select(T.distinct(User.name)).execute().generate(),
-        },
-        {
-            'comment': 'User.select(T.max(User.age), T.distinct(User.name)).execute().generate()',
-            'sql': User.select(T.max(User.age), T.distinct(User.name)).execute().generate(),
-        },
-        {
-            'comment': 'User.new(form).execute().generate()',
-            'sql': User.new(form).execute().generate(),
-        },
-        {
-            'comment': 'User.select(T.max(User.age), T.distinct(User.name)).execute().generate()',
-            'sql': User.select(T.max(User.age), T.distinct(User.name)).execute().generate(),
-        },
-        {
-            'comment': "User.update(form).where(User.name != '森').execute().generate()",
-            'sql': User.update(form).where(User.name != '森').execute().generate(),
-        },
-        {
-            'comment': "User.delete().where(User.name != '森').execute().generate()",
-            'sql': User.delete().where(User.name != '森').execute().generate(),
-        },
-        {
-            'comment': "User.select(T.alias(T.max(User.age), 'max_age'), T.distinct(User.name)).execute().generate()",
-            'sql': User.select(T.alias(T.max(User.age), 'max_age'), T.distinct(User.name)).execute().generate(),
-        },
-        {
-            'comment': "User.select(T.alias(User.name, 'user_name')).execute().generate()",
-            'sql': User.select(T.alias(User.name, 'user_name')).execute().generate(),
-        },
-    ]
-
-    template_print = '''
-    {comment}
-    >>>
-    {sql}
-    '''
-    sqls = map(lambda v: template_print.format(**v), sqls)
-    s = _join_string(sqls, glue='\n')
-
-    template = '''
-    class User(Queryable):
-        __tablename__ = 'user'
-        name = CharField()
-        age = IntergerField()
-        gender = CharField()
-        phone = CharField()
-
-    form = dict(
-        name='sen',
-        age=18,
-    )
-
-    {}
-    '''.format(s)
-    print(template)
+    #
+    # sqls = [
+    #     {
+    #         'comment': 'User.select().execute()',
+    #         'sql': User.select().execute(),
+    #     },
+    #     {
+    #         'comment': 'User.select(User.name).execute()',
+    #         'sql': User.select(User.name).execute(),
+    #     },
+    #     {
+    #         'comment': 'User.select(User.name, User.age).execute()',
+    #         'sql': User.select(User.name, User.age).execute(),
+    #     },
+    #     {
+    #         'comment': "User.select(User.name, User.age).where(User.phone == '136********').execute()",
+    #         'sql': User.select(User.name, User.age).where(User.phone == '136********').execute(),
+    #     },
+    #     {
+    #         'comment': "User.select(User.name, User.age).where((User.gender == '男') & (User.age >= 18)).execute()",
+    #         'sql': User.select(User.name, User.age).where((User.gender == '男') & (User.age >= 18)).execute(),
+    #     },
+    #     {
+    #         'comment': 'User.select(T.count(User.name)).execute()',
+    #         'sql': User.select(T.count(User.name)).execute(),
+    #     },
+    #     {
+    #         'comment': 'User.select(T.distinct(User.name)).execute()',
+    #         # 'sql': User.select(T.distinct(User.name)).execute(),
+    #     },
+    #     {
+    #         'comment': 'User.select(T.max(User.age), T.distinct(User.name)).execute()',
+    #         # 'sql': User.select(T.max(User.age), T.distinct(User.name)).execute(),
+    #     },
+    #     {
+    #         'comment': 'User.new(form).execute()',
+    #         'sql': User.new(form).execute(),
+    #     },
+    #     {
+    #         'comment': 'User.select(T.max(User.age), T.distinct(User.name)).execute()',
+    #         # 'sql': User.select(T.max(User.age), T.distinct(User.name)).execute(),
+    #     },
+    #     {
+    #         'comment': "User.update(form).where(User.name != '森').execute()",
+    #         'sql': User.update(form).where(User.name != '森').execute(),
+    #     },
+    #     {
+    #         'comment': "User.delete().where(User.name != '森').execute()",
+    #         'sql': User.delete().where(User.name != '森').execute(),
+    #     },
+    #     {
+    #         'comment': "User.select(T.alias(T.max(User.age), 'max_age'), T.distinct(User.name)).execute()",
+    #         'sql': User.select(T.alias(T.max(User.age), 'max_age'), T.distinct(User.name)).execute(),
+    #     },
+    #     {
+    #         'comment': "User.select(T.alias(User.name, 'user_name')).execute()",
+    #         'sql': User.select(T.alias(User.name, 'user_name')).execute(),
+    #     },
+    # ]
+    #
+    #
+    # template_print = '''
+    # {comment}
+    # >>>
+    # {sql}
+    # '''
+    # sqls = map(lambda v: template_print.format(**v), sqls)
+    # s = _join_string(sqls, glue='\n')
+    #
+    # template = '''
+    # class User(Queryable):
+    #     __tablename__ = 'user'
+    #     name = CharField()
+    #     age = IntergerField()
+    #     gender = CharField()
+    #     phone = CharField()
+    #
+    # form = dict(
+    #     name='sen',
+    #     age=18,
+    # )
+    #
+    # {}
+    # '''.format(s)
+    # print(template)
+    #
+    #
+    # sqlite = QSQLite('test.db')
+    # sql = User.select(T.alias(User.name, 'user_name')).execute()
+    # sqlite._execute_sql(sql)
