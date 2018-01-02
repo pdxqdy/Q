@@ -5,7 +5,7 @@ from db import QSQLite
 from q import Q
 from q import T
 from q import CharField
-from q import IntergerField
+from q import IntegerField
 
 
 def log(models):
@@ -32,9 +32,9 @@ if __name__ == '__main__':
 
     class User(Q):
         __tablename__ = 'user'
-        id = IntergerField()
+        id = IntegerField()
         name = CharField()
-        age = IntergerField()
+        age = IntegerField()
         gender = CharField()
         phone = CharField()
 
@@ -63,3 +63,22 @@ if __name__ == '__main__':
 
     users = User.select(T.distinct(User.age)).execute()
     log(users)
+
+    users = User.select().where(User.name == 'sen').range(1).execute()
+    user = users[0]
+    print(user.id, user.name, user.age, user.phone)
+
+    users = User.select().range(0, 10).execute()
+    user = users[0]
+    print(user.id, user.name, user.age, user.phone)
+
+    users = User.select().order_by(User.age).execute()
+    for user in users:
+        print(user.id, user.name, user.age, user.phone)
+
+    users = User.select(T.alias(T.count(User.age), 'count'), User.age).group_by(User.age).execute()
+    for user in users:
+        print(user.age, user.count)
+
+
+

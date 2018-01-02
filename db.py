@@ -20,9 +20,10 @@ class QSQLite(QDataBase):
     def _execute_sql(self, sql):
         print('QSQLite execute sql: {}'.format(sql))
         conn = self._connent()
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute(sql)
-        data = [m for m in cursor]
+        data = [{k: m[k] for k in m.keys()} for m in cursor]
         conn.commit()
         conn.close()
         return data

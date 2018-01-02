@@ -6,6 +6,10 @@ class Q(object):
     expression_list = []
     db = QSQLite('test.db')
 
+    def __init__(self, form):
+        for k, v in form.items():
+            setattr(self, k, v)
+
     @classmethod
     def table_name(cls):
         return cls.__tablename__
@@ -46,20 +50,26 @@ class Q(object):
         return cls
 
     @classmethod
-    def order_by(cls):
-        pass
+    def order_by(cls, *keys):
+        cls.expression_list.append(Node('order_by', *keys))
+        return cls
 
     @classmethod
-    def group_by(cls):
-        pass
+    def group_by(cls, *keys):
+        cls.expression_list.append(Node('group_by', *keys))
+        return cls
+
+    @classmethod
+    def range(cls, *keys):
+        cls.expression_list.append(Node('range', *keys))
+        return cls
 
     @classmethod
     def execute(cls):
         sql = SQL(cls.expression_list, cls.field()).generate()
-        data = cls.db._execute_sql(sql)
+        data = cls.db.execute_sql(sql)
         cls.expression_list = []
-        # sql.generate()
-        return data
+        return [cls(v) for v in data]
 
     @classmethod
     def generate_sql(cls):
@@ -148,8 +158,19 @@ class SQL(object):
                 sub_sql = self._generate_delete(node.args)
                 sql.append(sub_sql)
 
-        return _join_string(sql, ' ')
+            if node.op == 'order_by':
+                sub_sql = self._generate_order_by(node.args)
+                sql.append(sub_sql)
 
+            if node.op == 'group_by':
+                sub_sql = self._generate_group_by(node.args)
+                sql.append(sub_sql)
+
+            if node.op == 'range':
+                sub_sql = self._generate_limit(node.args)
+                sql.append(sub_sql)
+
+        return _join_string(sql, ' ')
 
     def _generate_select(self, nodes):
         tablename = self.mapper.get('tablename')
@@ -199,6 +220,22 @@ class SQL(object):
     def _generate_delete(self, node):
         tablename = self.mapper.get('tablename')
         return SQLPattern.delete.format(tablename)
+
+    def _generate_order_by(self, node):
+        node = node[0]
+        return SQLPattern.order_by.format(self.mapper.get((node.uuid())))
+
+    def _generate_group_by(self, node):
+        node = node[0]
+        return SQLPattern.group_by.format(self.mapper.get((node.uuid())))
+
+    def _generate_limit(self, node):
+        if len(node) == 0:
+            return SQLPattern.empty
+        elif len(node) == 1:
+            return SQLPattern.limit.format(0, node[0])
+        else:
+            return SQLPattern.limit.format(node[0], node[1])
 
 
 class Expression(object):
@@ -263,7 +300,7 @@ class CharField(Field):
     pass
 
 
-class IntergerField(Field):
+class IntegerField(Field):
     pass
 
 
@@ -286,129 +323,7 @@ class SQLPattern(object):
     set = 'set {}'
     set_element = '{} = {}'
     delete = 'delete from {}'
-
-
-
-if __name__ == '__main__':
-    # Q v0.2
-    sql = '''
-        CREATE TABLE user
-          (
-             id     INT PRIMARY KEY,
-             name   CHAR(50) NOT NULL,
-             age    INT NOT NULL,
-             gender INT(50),
-             phone  CHAR(50)
-          );
-    '''
-    try:
-        QSQLite('test.db')._execute_sql(sql)
-    except sqlite3.OperationalError:
-        pass
-    class User(Q):
-        __tablename__ = 'user'
-        name = CharField()
-        age = IntergerField()
-        gender = CharField()
-        phone = CharField()
-
-    form = dict(
-        name='sen',
-        age=18,
-    )
-    for i in range(10):
-        User.new(form).execute()
-        users = User.select(User.age).where(User.name == 'sen').execute()
-        for user in users:
-            print(user)
-
-    #
-    # sqls = [
-    #     {
-    #         'comment': 'User.select().execute()',
-    #         'sql': User.select().execute(),
-    #     },
-    #     {
-    #         'comment': 'User.select(User.name).execute()',
-    #         'sql': User.select(User.name).execute(),
-    #     },
-    #     {
-    #         'comment': 'User.select(User.name, User.age).execute()',
-    #         'sql': User.select(User.name, User.age).execute(),
-    #     },
-    #     {
-    #         'comment': "User.select(User.name, User.age).where(User.phone == '136********').execute()",
-    #         'sql': User.select(User.name, User.age).where(User.phone == '136********').execute(),
-    #     },
-    #     {
-    #         'comment': "User.select(User.name, User.age).where((User.gender == '男') & (User.age >= 18)).execute()",
-    #         'sql': User.select(User.name, User.age).where((User.gender == '男') & (User.age >= 18)).execute(),
-    #     },
-    #     {
-    #         'comment': 'User.select(T.count(User.name)).execute()',
-    #         'sql': User.select(T.count(User.name)).execute(),
-    #     },
-    #     {
-    #         'comment': 'User.select(T.distinct(User.name)).execute()',
-    #         # 'sql': User.select(T.distinct(User.name)).execute(),
-    #     },
-    #     {
-    #         'comment': 'User.select(T.max(User.age), T.distinct(User.name)).execute()',
-    #         # 'sql': User.select(T.max(User.age), T.distinct(User.name)).execute(),
-    #     },
-    #     {
-    #         'comment': 'User.new(form).execute()',
-    #         'sql': User.new(form).execute(),
-    #     },
-    #     {
-    #         'comment': 'User.select(T.max(User.age), T.distinct(User.name)).execute()',
-    #         # 'sql': User.select(T.max(User.age), T.distinct(User.name)).execute(),
-    #     },
-    #     {
-    #         'comment': "User.update(form).where(User.name != '森').execute()",
-    #         'sql': User.update(form).where(User.name != '森').execute(),
-    #     },
-    #     {
-    #         'comment': "User.delete().where(User.name != '森').execute()",
-    #         'sql': User.delete().where(User.name != '森').execute(),
-    #     },
-    #     {
-    #         'comment': "User.select(T.alias(T.max(User.age), 'max_age'), T.distinct(User.name)).execute()",
-    #         'sql': User.select(T.alias(T.max(User.age), 'max_age'), T.distinct(User.name)).execute(),
-    #     },
-    #     {
-    #         'comment': "User.select(T.alias(User.name, 'user_name')).execute()",
-    #         'sql': User.select(T.alias(User.name, 'user_name')).execute(),
-    #     },
-    # ]
-    #
-    #
-    # template_print = '''
-    # {comment}
-    # >>>
-    # {sql}
-    # '''
-    # sqls = map(lambda v: template_print.format(**v), sqls)
-    # s = _join_string(sqls, glue='\n')
-    #
-    # template = '''
-    # class User(Queryable):
-    #     __tablename__ = 'user'
-    #     name = CharField()
-    #     age = IntergerField()
-    #     gender = CharField()
-    #     phone = CharField()
-    #
-    # form = dict(
-    #     name='sen',
-    #     age=18,
-    # )
-    #
-    # {}
-    # '''.format(s)
-    # print(template)
-    #
-    #
-    # sqlite = QSQLite('test.db')
-    # sql = User.select(T.alias(User.name, 'user_name')).execute()
-    # sqlite._execute_sql(sql)
+    empty = ''
+    limit = 'limit {},{}'
+    order_by = 'order by {}'
+    group_by = 'group by {}'

@@ -1,5 +1,5 @@
 from q import Q
-from q import IntergerField
+from q import IntegerField
 from q import CharField
 from q import T
 from q import _join_string
@@ -9,7 +9,7 @@ if __name__ == '__main__':
     class User(Q):
         __tablename__ = 'user'
         name = CharField()
-        age = IntergerField()
+        age = IntegerField()
         gender = CharField()
         phone = CharField()
 
