@@ -85,6 +85,8 @@ class Q(object):
                 raise
             if not isinstance(attr, Field):
                 raise
+            if attr.validate(v) is False:
+                raise
         n = Node('insert', form)
         cls.expression_list.append(n)
         return cls
@@ -259,7 +261,7 @@ class Expression(object):
 class Field(object):
     def __init__(self, k=None):
         self.k = k
-        self.o = Node
+        self.o = None
         self.op = None
 
     def __eq__(self, o):
@@ -295,13 +297,18 @@ class Field(object):
     def uuid(self):
         return id(self)
 
+    def validate(self, v):
+        return NotImplemented
+
 
 class CharField(Field):
-    pass
+    def validate(self, v):
+        return isinstance(v, str)
 
 
 class IntegerField(Field):
-    pass
+    def validate(self, v):
+        return isinstance(v, int)
 
 
 def _join_string(_list, glue=', '):
