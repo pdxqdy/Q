@@ -1,4 +1,4 @@
-from db import QSQLite
+from q.db import QSQLite
 
 
 class Q(object):
@@ -82,11 +82,11 @@ class Q(object):
         for k, v in form.items():
             attr = getattr(cls, k)
             if attr is None:
-                raise
+                raise Exception()
             if not isinstance(attr, Field):
                 raise
             if attr.validate(v) is False:
-                raise
+                raise Exception('key: {} 类型错误。value: {}'.format(k, v))
         n = Node('insert', form)
         cls.expression_list.append(n)
         return cls

@@ -1,7 +1,7 @@
 import sqlite3
 import random
 import string
-from db import QSQLite
+from q import QSQLite
 from q import Q
 from q import T
 from q import CharField
@@ -35,7 +35,7 @@ if __name__ == '__main__':
         id = IntegerField()
         name = CharField()
         age = IntegerField()
-        gender = CharField()
+        gender = IntegerField()
         phone = CharField()
 
 
@@ -79,6 +79,3 @@ if __name__ == '__main__':
     users = User.select(T.alias(T.count(User.age), 'count'), User.age).group_by(User.age).execute()
     for user in users:
         print(user.age, user.count)
-
-
-
